@@ -64,9 +64,14 @@ rsconnect/
 /tmp
 *.zip
 *.docx
+*.html
 
 /boot/data
 /boot/library
 /boot/software
 *.Rproj
 .Rproj.user
+
+# parallel progress txt files
+output_parFun_*.txt
+

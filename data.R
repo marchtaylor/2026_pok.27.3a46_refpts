@@ -23,6 +23,7 @@ library(rmarkdown)
 taf.library(FLfse)
 library(beepr)
 library(stockassessment)
+library(mvnfast)
 
 
 source("data_01_objects.R")

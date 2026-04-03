@@ -13,13 +13,14 @@ RANGE <- range(stock)
 # settings ----------------------------------------------------------------
 
 # NUMBER of cores
-ncores <- 10 # detectCores()/2 
+ncores <- 41 # detectCores()/2 
 
 # ITERATIONS
-it <- 300
+it <- 500
 
 # PROJECTION years
 ny <- 30
+
 
 # EVALUATION years - number of terminal projections years to evaluate for reference points
 ey <- 10

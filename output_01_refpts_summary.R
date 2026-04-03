@@ -10,7 +10,7 @@ load(file = "model/condition_mse_objects.Rdata", verbose = T)
 load(file = "model/newBRPs.Rdata", verbose = T)
 
 df1 <- readRDS(file = "model/sum_wErr_noAR.rds")
-df2 <- readRDS(file = "model/sum_wErr_wAR.rds")
+df3 <- readRDS(file = "model/sum_wErr_wAR.rds")
 
 
 
@@ -23,7 +23,7 @@ RES <- lapply(L, function(x){
     df.x <- get("df1")
   }
   if(x == "wErr_wAR"){
-    df.x <- get("df2")
+    df.x <- get("df3")
   }
   
   newdat.x <- tibble(data.frame(Ftarg = seq(min(df.x$Ftarg), max(df.x$Ftarg), by = 1e-3), scen = x))
@@ -102,4 +102,55 @@ p <- (p1 / p2) + plot_layout(guides = 'collect', axes = "collect")
 png("output/yield+ssb~Fscan.png", width = 6, height = 5, units = "in", res = 400)
 print(p)
 dev.off()
+
+
+
+
+# risk --------------------------------------------------------------------
+# pcalc <- function(SSB, Blim){
+#   # annual probability of SSB < Blim
+#   annP <- apply(SSB, 1, function(x){mean(x < Blim)})
+#   # Ps
+#   P1 <- mean(annP)
+#   P2 <- mean(apply(SSB, 2, function(x){max(x < Blim)}))
+#   P3 <- max(annP)
+#   return(list(P1 = P1, P2 = P2, P3 = P3))
+# }
+
+df_blim <- data.frame(blim = c(om@sr@params["b"]), iter = ac(seq(c(om@sr@params["b"]))))
+df3a <- df3 |> left_join(df_blim)
+df3a <- df3a |> mutate(unsafe = if_else(slot == "ssb", data < blim, NA))
+
+tmp1 <- df3a |> filter(slot == "ssb", year %in% ((fy-ey):fy)) |> group_by(Ftarg, year) |> 
+  summarise(annP = mean(data < blim)) |> ungroup()
+
+# tmp2 <- df3a |> filter(slot == "ssb", year %in% ((fy-ey):fy)) |> group_by(Ftarg, year) |> 
+#   summarise(maxP = max(data < blim)) |> ungroup()
+
+
+
+tmp <- tmp1 |> group_by(Ftarg) |> summarise(prob1 = mean(annP), prob3 = max(annP))
+tmp <- tmp |> pivot_longer(cols = -1, names_to = "risk_type", values_to = "value")
+tmp
+
+
+newdat <- data.frame(Ftarg = seq(0, max(df3$Ftarg), by = 0.001), risk_type = "prob3")
+newdat$value <- with(subset(tmp, risk_type == "prob3"), approx(x = Ftarg, y = value, xout = newdat$Ftarg, rule = 2))$y
+(Fpa <- newdat |> group_by(risk_type) |> summarise(Fpa = max(Ftarg[value < 0.05])) |> pull(Fpa))
+Flabel <- paste("Fpa", sprintf("%.3f", Fpa), sep = " = ", collapse = "\n")
+
+
+p <- ggplot(tmp) + aes(x = Ftarg, y = value, group = risk_type, colour = risk_type) + 
+  geom_hline(yintercept = 0.05, lty = 3, col = 2) + 
+  geom_vline(xintercept = Fpa, lty = 3) + 
+  geom_line() +
+  geom_point() +
+  # geom_line(data = newdat, lty = 2, color = 4) +
+  annotate("label", x = Fpa, y = Inf, label = Flabel, hjust = 1.1, vjust = 1.1, size = 3) + 
+  theme_bw()
+
+png("output/risk_type~Fscan.png", width = 5, height = 3.5, units = "in", res = 400)
+print(p)
+dev.off()
+
 
