@@ -47,3 +47,26 @@ po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# ignore all further steps (besides bootstrap)
+/bootstrap/*
+!/bootstrap/initial
+!/bootstrap/initial/*
+!/bootstrap/*.bib
+
+
+/data
+/input
+/model
+/output
+/report
+/auxiliary
+/tmp
+*.zip
+*.docx
+
+/boot/data
+/boot/library
+/boot/software
+*.Rproj
+.Rproj.user
