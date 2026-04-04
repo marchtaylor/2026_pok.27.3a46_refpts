@@ -16,7 +16,7 @@ RANGE <- range(stock)
 ncores <- 41 # detectCores()/2 
 
 # ITERATIONS
-it <- 500
+it <- 1000
 
 # PROJECTION years
 ny <- 30
@@ -39,8 +39,8 @@ fy <- dy + ny
 Fscan <- seq(0, 0.8, by = 0.02)
 
 # lags
-data_lag = 1
-management_lag = 1
+data_lag <- 1
+management_lag <- 1
 
 data.frame(ncores, it, ny, ey, dy, iy, fy, data_lag, management_lag)
 
@@ -52,13 +52,15 @@ SSBcv <- 0
 # stock recruitment settings
 recrLag <- RANGE["min"]
 srr_years <- (2004 - recrLag) : dy
-
 srr_models <- "segreg3"
+use_rhologRec <- TRUE
+
 bio_const <- FALSE
 bio_years <- (dy-10):dy
+
 sel_const <- FALSE
 sel_years <- (dy-5):dy
-use_rhologRec <- TRUE
+
 
 
 

@@ -122,14 +122,15 @@ df3a <- df3 |> left_join(df_blim)
 df3a <- df3a |> mutate(unsafe = if_else(slot == "ssb", data < blim, NA))
 
 tmp1 <- df3a |> filter(slot == "ssb", year %in% ((fy-ey):fy)) |> group_by(Ftarg, year) |> 
-  summarise(annP = mean(data < blim)) |> ungroup()
+  summarise(annP = mean(data < blim)) |> ungroup() |> 
+  group_by(Ftarg) |> summarise(prob1 = mean(annP), prob3 = max(annP))
 
-# tmp2 <- df3a |> filter(slot == "ssb", year %in% ((fy-ey):fy)) |> group_by(Ftarg, year) |> 
-#   summarise(maxP = max(data < blim)) |> ungroup()
+tmp2 <- df3a |> filter(slot == "ssb", year %in% ((fy-ey):fy)) |> group_by(Ftarg, iter) |>
+  summarise(prob = max(data < blim)) |> ungroup() |> 
+  group_by(Ftarg) |> summarise(prob2 = mean(prob)) |> ungroup()
+plot(tmp2)
 
-
-
-tmp <- tmp1 |> group_by(Ftarg) |> summarise(prob1 = mean(annP), prob3 = max(annP))
+tmp <- tmp1 |> left_join(tmp2)
 tmp <- tmp |> pivot_longer(cols = -1, names_to = "risk_type", values_to = "value")
 tmp
 
@@ -137,14 +138,14 @@ tmp
 newdat <- data.frame(Ftarg = seq(0, max(df3$Ftarg), by = 0.001), risk_type = "prob3")
 newdat$value <- with(subset(tmp, risk_type == "prob3"), approx(x = Ftarg, y = value, xout = newdat$Ftarg, rule = 2))$y
 (Fpa <- newdat |> group_by(risk_type) |> summarise(Fpa = max(Ftarg[value < 0.05])) |> pull(Fpa))
-Flabel <- paste("Fpa", sprintf("%.3f", Fpa), sep = " = ", collapse = "\n")
+Flabel <- paste("Fpa (Prob3)", sprintf("%.3f", Fpa), sep = " = ", collapse = "\n")
 
 
 p <- ggplot(tmp) + aes(x = Ftarg, y = value, group = risk_type, colour = risk_type) + 
   geom_hline(yintercept = 0.05, lty = 3, col = 2) + 
   geom_vline(xintercept = Fpa, lty = 3) + 
   geom_line() +
-  geom_point() +
+  geom_point(size = 1) +
   # geom_line(data = newdat, lty = 2, color = 4) +
   annotate("label", x = Fpa, y = Inf, label = Flabel, hjust = 1.1, vjust = 1.1, size = 3) + 
   theme_bw()
@@ -154,3 +155,47 @@ print(p)
 dev.off()
 
 
+
+# bootstrapped prob3 ------------------------------------------------------
+
+dfboot <- df3a |> filter(slot == "ssb", year %in% ((fy-ey):fy)) 
+newdat <- data.frame(Ftarg = seq(0,max(df3$Ftarg), by = 0.001), type = "p3")
+
+
+# Split once outside loop
+df_list <- split(dfboot, dfboot$iter)
+
+nsamp <- 500
+RES <- numeric(nsamp)
+pb <- txtProgressBar(max = nsamp, style = 3)
+
+for(i in seq_len(nsamp)) {
+
+  samp_i <- sample(seq_len(it), size = it, replace = TRUE)
+
+  # bind rows directly instead of join
+  dfboot_i <- bind_rows(df_list[samp_i])
+
+  tmp_i <- dfboot_i %>%
+    group_by(Ftarg, year) %>%
+    summarise(annP = mean(data < blim), .groups = "drop") %>%
+    group_by(Ftarg) %>%
+    summarise(prob3 = max(annP), .groups = "drop")
+
+  newdat$prob3 <- approx(
+    x = tmp_i$Ftarg,
+    y = tmp_i$prob3,
+    xout = newdat$Ftarg,
+    rule = 2
+  )$y
+
+  RES[i] <- max(newdat$Ftarg[newdat$prob3 < 0.05])
+
+  setTxtProgressBar(pb, i)
+}
+
+close(pb)
+hist(RES, nclass = 20); abline(v = newBRPs$Fpa, col = 2)
+
+sd(RES)/newBRPs$Fpa
+sd(RES)/mean(RES)
