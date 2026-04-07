@@ -13,7 +13,7 @@ RANGE <- range(stock)
 # settings ----------------------------------------------------------------
 
 # NUMBER of cores
-ncores <- 41 # detectCores()/2 
+ncores <- 41 # detectCores()/2 *** set high for use on cluster (e.g. Fscan levels, which are parallelized)
 
 # ITERATIONS
 it <- 1000
