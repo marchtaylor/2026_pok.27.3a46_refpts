@@ -29,3 +29,12 @@ Four main scripts are used: data.R, model.R, output.R, and report.R. In most cas
   - **output_01_refpts_summary.R** - Produces summary figures of Fscans: 1. landings & SSB, 2. risk probability.
 - **report.R** - To generate final report with Rmarkdown (TO COME). 
 
+
+
+## To do:
+
+Further documentation:
+
+ - Move setting of recruitment resampling in STF to **model_01_settings.R** from **model_05_run_mse.R** (`recyrs = 10`) 
+ 
+ 
