@@ -36,5 +36,5 @@ Four main scripts are used: data.R, model.R, output.R, and report.R. In most cas
 Further documentation:
 
  - Move setting of recruitment resampling in STF to **model_01_settings.R** from **model_05_run_mse.R** (`recyrs = 10`) 
- 
+ - Switch from `parallel::parLapply` to `mse::mps` to run Fscan?
  
