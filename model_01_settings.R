@@ -13,13 +13,13 @@ RANGE <- range(stock)
 # settings ----------------------------------------------------------------
 
 # NUMBER of cores
-ncores <- 41 # detectCores()/2 *** set high for use on cluster (e.g. Fscan levels, which are parallelized)
+ncores <- 10 # detectCores()/2 *** set high for use on cluster (e.g. Fscan levels, which are parallelized)
 
 # ITERATIONS
 it <- 1000
 
 # PROJECTION years
-ny <- 30
+ny <- 35
 
 
 # EVALUATION years - number of terminal projections years to evaluate for reference points
@@ -61,6 +61,9 @@ bio_years <- (dy-10):dy
 sel_const <- FALSE
 sel_years <- (dy-5):dy
 
+# stf (isys - implementation system) settings
+recyrs <- 10 # number of recent years to resample for projection
+
 
 
 
@@ -69,5 +72,6 @@ save(ncores, it, ny, ey, dy, iy, fy, Fscan,
   DIMS, RANGE, 
   Fcv, Fphi, SSBcv,
   srr_years, srr_models, bio_const, bio_years, sel_const, sel_years, use_rhologRec,
+  recyrs,
   file = "model/settings.Rdata")
 

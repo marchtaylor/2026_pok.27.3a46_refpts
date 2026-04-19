@@ -5,7 +5,7 @@ rm(list = ls())
 # 1. load data ------------------------------------------------------
 
 load(file = "data/objects.Rdata", verbose = T)
-load(file = "model/settings.Rdata")
+load(file = "model/settings.Rdata", verbose = T)
 load(file = "model/condition_mse_objects.Rdata", verbose = T)
 
 om@refpts
@@ -47,8 +47,8 @@ parFun_noErr_noAR <- function(x){
       args = list(lim = 0, trigger = 0, target = Ftarg, # *** trigger = 0
         min = 0, metric = "ssb", output = "fbar")),
     # (i)mplementation (sys)tem: tac.is (C ~ F) + F deviances
-    isys = mseCtrl(method=tac.is, 
-      args = list(recyrs = 10, fmin = 0, Fdevs = sdevs$F*0+1)) # *** Fcv = 0 (includes Fphi)
+    isys = mseCtrl(method = tac.is, 
+      args = list(recyrs = recyrs, fmin = 0, Fdevs = sdevs$F*0+1)) # *** Fcv = 0 (includes Fphi)
   ))
   
   # - RUN applying ICES advice rule
@@ -103,7 +103,7 @@ parFun_wErr_noAR <- function(x){
         min = 0, metric = "ssb", output = "fbar")),
     # (i)mplementation (sys)tem: tac.is (C ~ F) + F deviances
     isys = mseCtrl(method=tac.is, 
-      args = list(recyrs = 10, fmin = 0, Fdevs = sdevs$F)) # *** Fcv (includes Fphi)
+      args = list(recyrs = recyrs, fmin = 0, Fdevs = sdevs$F)) # *** Fcv (includes Fphi)
   ))
   
   # - RUN applying ICES advice rule
@@ -157,7 +157,7 @@ parFun_wErr_wAR <- function(x){
         min = 0, metric = "ssb", output = "fbar")),
     # (i)mplementation (sys)tem: tac.is (C ~ F) + F deviances
     isys = mseCtrl(method=tac.is, 
-      args = list(recyrs = 10, fmin = 0, Fdevs = sdevs$F)) # *** Fcv (includes Fphi)
+      args = list(recyrs = recyrs, fmin = 0, Fdevs = sdevs$F)) # *** Fcv (includes Fphi)
   ))
   
   # - RUN applying ICES advice rule
@@ -195,7 +195,7 @@ outfile = "output_parFun_wErr_noAR.txt"
 unlink(outfile)
 
 # only pass relevant ARGs to avoid memory cluttering
-ARGS =  c("outfile", "om", "dy", "iy", "fy", "it", "info", "sdevs", "iem", "data_lag", "management_lag")
+ARGS =  c("outfile", "om", "dy", "iy", "fy", "it", "info", "sdevs", "iem", "data_lag", "management_lag", "recyrs")
 
 # Set-up cluster and run
 clusterType <- ifelse(Sys.info()["sysname"] == "Windows", "PSOCK", "FORK")
@@ -309,7 +309,7 @@ outfile = "output_parFun_wErr_wAR.txt"
 unlink(outfile)
 
 # only pass relevant ARGs to avoid memory cluttering
-ARGS =  c("outfile", "om", "dy", "iy", "fy", "it", "info", "sdevs", "iem", "data_lag", "management_lag", "Btrig_used")
+ARGS =  c("outfile", "om", "dy", "iy", "fy", "it", "info", "sdevs", "iem", "data_lag", "management_lag", "recyrs", "Btrig_used")
 
 # Set-up cluster and run
 clusterType <- ifelse(Sys.info()["sysname"] == "Windows", "PSOCK", "FORK")

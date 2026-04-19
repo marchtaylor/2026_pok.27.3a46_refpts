@@ -9,6 +9,7 @@ mkdir("data")
 
 
 # load packages -----------------------------------------------------------
+library(msy) # Eqsim
 library(FLCore)
 library(FLasher)
 library(mse)
