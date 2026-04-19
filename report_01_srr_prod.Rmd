@@ -1,0 +1,748 @@
+---
+title: "Stock-recruitment and productivity"
+author: "Marc Taylor"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  cache = F, 
+  cache.path = 'tmp/cache/', fig.path  ='tmp/tex_supplMat/',
+  # fig.align='center',
+  comment = NA,
+  message = FALSE, warning = FALSE, 
+  echo = FALSE,
+  tidy.opts=list(width.cutoff=60), tidy=TRUE # automatically wraps code
+)
+```
+
+# Set-up
+
+```{r}
+library(FLCore)
+library(FLasher)
+library(FLSRTMB)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+library(rmarkdown)
+library(FLfse)
+library(png)
+library(patchwork)
+library(stockassessment)
+library(changepoint)
+library(sinkr)
+library(knitr)
+
+# load stock assessment
+# SAM
+load(file = "data/objects.Rdata", verbose = T)
+
+
+load(file = "model/settings.Rdata", verbose = T)
+
+load(file = "model/condition_mse_objects.Rdata", verbose = T)
+
+```
+
+
+# SPR0
+
+Spawning biomass per recruit without fishing.
+
+
+```{r}
+df <- as.data.frame(spr0y(stock))
+p <- ggplot(df) + aes(x = year, y = data) + 
+  geom_line() + 
+  labs(x = NULL, y = bquote(SPR[0]~"(Spawning biomass per recruit)"~"[kg]")) + 
+  theme_bw()
+# p
+
+fname <- "report/figs/spr0.png"
+png(fname, width = 6, height = 4, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+What contributes to this?
+
+### Maturity
+
+```{r}
+tmp <- as.data.frame(mat(stock))
+p1 <- ggplot(tmp) + aes(x = year, y = data, group = age, color = factor(age)) +
+  geom_line() +
+  labs(y = "mat")
+
+p2 <- ggplot(tmp) + aes(x = year, y = data, group = age) +
+  facet_wrap(~age, scales = "free_y") +
+  geom_line() + 
+  labs(y = "mat")
+
+tmp <- as.data.frame(FLCore::FLCohort(mat(stock)))
+p3 <- ggplot(tmp) + aes(x = age, y = data, group = cohort, color = cohort) + 
+  geom_line() + 
+  scale_color_viridis_c() +
+  labs(y = "mat")
+
+p <- (p2 / p3) &
+  theme_bw() &
+  theme(text = element_text(size = 9), 
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+fname <- "report/figs/mat.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+### Weight-at-age
+
+```{r}
+tmp <- as.data.frame(stock.wt(stock))
+p1 <- ggplot(tmp) + aes(x = year, y = data, group = age, color = factor(age)) +
+  geom_line() +
+  labs(y = "stock.wt")
+
+p2 <- ggplot(tmp) + aes(x = year, y = data, group = age) +
+  facet_wrap(~age, scales = "free_y") +
+  geom_line() + 
+  labs(y = "stock.wt")
+
+tmp <- as.data.frame(FLCore::FLCohort(stock.wt(stock)))
+p3 <- ggplot(tmp) + aes(x = age, y = data, group = cohort, color = cohort) + 
+  geom_line() + 
+  scale_color_viridis_c() +
+  labs(y = "stock.wt")
+
+p <- (p2 / p3) &
+  theme_bw() &
+  theme(text = element_text(size = 9), 
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+fname <- "report/figs/stockwt.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+
+```
+
+
+### Mortality-at-age
+
+Constant
+
+```{r}
+tmp <- as.data.frame(m(stock))
+p <- ggplot(tmp) + aes(x = year, y = data, group = age, color = factor(age)) +
+  geom_line() +
+  labs(y = "m") +
+  theme_bw()
+
+fname <- "report/figs/M.png"
+png(fname, width = 6, height = 4, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+## Contribution to year-to-year changes
+
+```{r}
+years <- dimnames(stock@m)$year
+
+base <- spr0y(stock)
+years0 <- years[-length(years)]
+years1 <- years[-1]
+
+# maturity change
+stock1 <- stock
+slot(stock1, "mat")[,years0] <- slot(stock, "mat")[,years1]
+s1 <- spr0y(stock1)
+
+# weight change
+stock1 <- stock
+slot(stock1, "stock.wt")[,years0] <- slot(stock, "stock.wt")[,years1]
+s2 <- spr0y(stock1)
+
+# natural mortality change
+stock1 <- stock
+slot(stock1, "m")[,years0] <- slot(stock, "m")[,years1]
+s3 <- spr0y(stock1)
+
+res <- data.frame(
+  year = years,
+  spr0y = c(base),
+  mat = c(s1 - base),
+  wt = c(s2 - base),
+  M = c(s3 - base)
+)
+
+res <- res |> 
+  rowwise() |> 
+  mutate(total = sum(abs(c(mat,wt,M))),
+    mat_rel = abs(mat)/total,
+    wt_rel  = abs(wt)/total,
+    M_rel   = abs(M)/total) |> ungroup()
+
+tmp <- res |> select(year, mat_rel, wt_rel, M_rel) |> pivot_longer(cols = -1)
+
+p <- ggplot(tmp) +
+  aes(x = as.numeric(year), y = value, group = name, fill = name) + 
+  geom_col() + 
+  scale_y_continuous(limits = c(0, 1), expand = c(0, 0)) +
+  labs(y = bquote("Relative contribution to "*Delta * SPR[0])) +
+  theme_bw() +
+  scale_fill_brewer(palette = "Set1") +
+  theme(text = element_text(size = 10), 
+    axis.title.x = element_blank(), 
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+fname <- "report/figs/relSPR0.png"
+png(fname, width = 6, height = 3, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+# Selectivity
+
+```{r}
+tmp <- as.data.frame(apply(harvest(stock), MARGIN = 2, FUN = function(x){x/max(x)}))
+
+p1 <- ggplot(tmp) + aes(x = year, y = data, group = age, color = factor(age)) +
+  geom_line() +
+  labs(y = "selectivity (scaled F)")
+
+p2 <- ggplot(tmp) + aes(x = year, y = data, group = age) +
+  facet_wrap(~age, scales = "free_y") +
+  geom_line() + 
+  labs(y = "selectivity (scaled F)")
+
+p3 <- ggplot(tmp) + aes(x = age, y = data, group = year, color = year) + 
+  geom_line() + 
+  scale_color_viridis_c() +
+  labs(y = "selectivity (scaled F)")
+
+p <- (p2 / p3) &
+  theme_bw() &
+  theme(text = element_text(size = 9), 
+    axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+fname <- "report/figs/selectivity.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+
+
+
+# Recruitment
+
+## Recruit per spawning biomass changes
+
+```{r}
+rec_lag <- c(range(stock)["min"])
+tmp <- as.FLSR(stock)
+df <- tibble(as.data.frame(tmp))
+df <- df |> select(slot, year, data)
+df <- df |> mutate(yearRec = ifelse(slot == "ssb", year+rec_lag, year))
+df <- df |> select(slot, yearRec, data)
+
+df <- df |> pivot_wider(names_from = slot, values_from = data)
+df <- df |> select(rec, ssb, yearRec)
+df <- df |> mutate(rs = rec/ssb)
+df <- df[complete.cases(df),]
+df <- df |>  pivot_longer(cols = c(rec, ssb, rs))
+df <- df |> mutate(nameF = factor(name, levels = c("ssb", "rec", "rs"), labels = c("SSB [t]", "Rec ['000s]", "Rec/SSB ['000s/t]")))
+
+p <- ggplot(subset(df, name == "rs")) + aes(x = yearRec, y = value) +
+  geom_point() +
+  geom_smooth(span = 0.5) +
+  labs(x = "Cohort (recr. year)", y = "R/SSB") +
+  theme_bw()
+
+fname <- "report/figs/RS_ratio.png"
+png(fname, width = 6, height = 4, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+p <- ggplot(df) + aes(x = yearRec, y = value, group = nameF) +
+  facet_wrap(~nameF, nrow = 3, scale = "free_y") +
+  geom_point() + 
+  geom_smooth(span = 0.5) +
+  labs(x = "Cohort (recr. year)", y = NULL) + 
+  theme_bw()
+
+fname <- "report/figs/ssb_rec_rs.png"
+png(fname, width = 5, height = 7, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+
+```
+
+
+
+## Stock-recruitment pairs
+
+
+```{r}
+
+df2 <- df |> filter(name != "rs") |> select(yearRec, name, value) |> pivot_wider(id_cols = yearRec)
+p <- ggplot(df2) + aes(x = ssb, y = rec, color = yearRec, group = 1) + 
+  geom_path() + 
+  geom_point(size = 2) + 
+  scale_color_viridis_c()
+
+fname <- "report/figs/rec~ssb.png"
+png(fname, width = 6, height = 4, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+## Change-point
+
+```{r}
+df3 <- df |> filter(name == "rs")
+
+value.ts <- ts(c(df3$value), frequency=1, start=c(min(df3$yearRec),1), end=c(max(df3$yearRec),1)) # r/ssb time series
+
+# defaults
+mvalue <- cpt.meanvar(value.ts, method = "AMOC", minseglen = 20)
+cyears <- df3$yearRec[cpts(mvalue)+1]
+
+fname <- "report/figs/changepoint_defaults.png"
+png(fname, width = 6, height = 4, units = "in", res = 400)
+op <- par(mar = c(3,3,2,1), ps = 10, mgp = c(2,0.5,0))
+plot(mvalue, xlab = "Cohort (rec. year)", ylab = "Rec/SSB [`000 / t]")
+points(value.ts, pch = 20)
+abline(v = cyears, lty = 2, col = 8)
+text(x = cyears, y = max(value.ts)*0.8, labels = cyears, srt = 90, pos = 2, col = 8)
+title("AMOC, minseglen = 20")
+par(op)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+```{r}
+# defaults
+value.ts2 <- round(1000 * value.ts)
+mvalue <- cpt.meanvar(value.ts2, test.stat='Poisson', method='PELT', minseglen = 20)
+
+cyears <- df3$yearRec[cpts(mvalue)+1]
+
+fname <- "report/figs/changepoint_PELT.png"
+png(fname, width = 6, height = 4, units = "in", res = 400)
+op <- par(mar = c(3,3,2,1), ps = 10, mgp = c(2,0.5,0))
+plot(mvalue, xlab = "Cohort (rec. year)", ylab = "round(Rec/SSB*1000); test.stat = Poisson")
+points(value.ts2, pch = 20)
+abline(v = cyears, lty = 2, col = 8)
+text(x = cyears, y = max(value.ts2)*0.8, labels = cyears, srt = 90, pos = 2, col = 8)
+title("PELT, minseglen = 20")
+par(op)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+```{r}
+mvalue <- suppressWarnings(cpt.meanvar(value.ts, penalty = "BIC", method = 'SegNeigh', Q = 5))
+
+cyears <- df3$yearRec[cpts(mvalue)+1]
+
+fname <- "report/figs/changepoint_SegNeigh.png"
+png(fname, width = 6, height = 4, units = "in", res = 400)
+op <- par(mar = c(3,3,2,1), ps = 10, mgp = c(2,0.5,0))
+plot(mvalue, xlab = "Cohort (rec. year)", ylab = "Rec/SSB [`000 / t]")
+points(value.ts, pch = 20)
+abline(v = cyears, lty = 2, col = 8)
+text(x = cyears, y = max(value.ts)*0.8, labels = cyears, srt = 90, pos = 2, col = 8)
+title("SegNeigh, max. seg. = 5")
+par(op)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+
+```
+
+
+```{r}
+# fit = object of class sam
+# get estimates
+tmp1 <- tibble(data.frame(year = an(rownames(ssbtable(samfit0))), 
+  ssb = c(ssbtable(samfit0)[,"Estimate"])))
+tmp1 <- tmp1 |> mutate(recyear = year+min(an(dimnames(stock)$age)))
+tmp1 <- tmp1 |> select(recyear, ssb)
+
+tmp2 <- tibble(data.frame(recyear = an(rownames(rectable(samfit0))), 
+  rec = c(rectable(samfit0)[,"Estimate"])))
+
+dfest <- left_join(tmp1, tmp2, by = join_by(recyear))
+dfest <- dfest[complete.cases(dfest),]
+
+# generate new SR pairs
+nsims <- 100   # nr of samples to draw
+sr_var_cov <- samfit0$sdrep$covSRpairs # SR variance-covariance matrix from the SAM object
+
+# sample SR pairs: mean = logSSB and logR, variance = variance-covariance matrix
+SR_sims   <- exp(rmvnorm(n = nsims, mu = log(c(ssbtable(samfit0)[,"Estimate"], 
+  rectable(samfit0)[,"Estimate"])), Sigma = sr_var_cov))
+# SR_sims = matrix[(n_ssb + n_rec) x nsims]
+
+tmp1 <- tibble(as.data.frame(SR_sims[,seq(samfit0$data$noYears)]))
+names(tmp1) <- rownames(ssbtable(samfit0))
+tmp1 <- tmp1 |> mutate(sim = seq(nsims), .before = 1)
+tmp1 <- tmp1 |> pivot_longer(cols = -1, names_to = "year", values_to = "ssb")
+tmp1 <- tmp1 |> mutate(year = as.numeric(year), 
+  recyear = year+min(an(dimnames(stock)$age)))
+
+tmp2 <- tibble(as.data.frame(SR_sims[,seq(samfit0$data$noYears)+samfit0$data$noYears]))
+names(tmp2) <- rownames(rectable(samfit0))
+tmp2 <- tmp2 |> mutate(sim = seq(nsims), .before = 1)
+tmp2 <- tmp2 |> pivot_longer(cols = -1, names_to = "recyear", values_to = "rec")
+tmp2 <- tmp2 |> mutate(recyear = as.numeric(recyear))
+
+df <- tmp2 |> left_join(tmp1, by = join_by(sim, recyear))
+df <- df[complete.cases(df),]
+
+# recrLag <- range(stock)["min"]
+rec_years <- eqsim_lut[["POK"]]$srr_years
+  
+fname <- "report/figs/SR_redraw.png"
+png(fname, width = 7, height = 3, units = "in", res = 400)
+op <- par(mar = c(4,4,2,1), mgp = c(2,0.5,0), mfcol = c(1,2), ps = 10)
+
+plot(rec ~ ssb, df, pch = ".", cex = 1, col = adjustcolor(1,0.5),
+  xlab = "SSB [t]", ylab = "R (age 3) ['000]", 
+  xlim = c(0, max(ssb)), ylim = c(0, max(rec)))
+srplot(samfit0, years = F, add = T, polycol = adjustcolor(1, 0.05), linecol = NA)
+lines(rec ~ ssb, dfest, t = "o", pch = 21, bg = 4, cex = 0.7, lty = 2)
+mtext("full time series", side = 3, line = 0.5)
+
+plot(rec ~ ssb, data = subset(df, recyear %in% rec_years), pch = ".", cex = 1, col = adjustcolor(1,0.5),
+  xlab = "SSB [t]", ylab = "R (age 3) ['000]", 
+  xlim = c(0, max(ssb)), ylim = c(0, max(rec)))
+srplot(samfit0, years = F, add = T, polycol = adjustcolor(1, 0.05), linecol = NA)
+lines(rec ~ ssb, dfest, t = "o", pch = 21, bg = 4, cex = 0.7, lty = 2, col = 1)
+mtext("last 20 years", side = 3, line = 0.5)
+
+par(op)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+
+```
+
+
+
+## SRR fits
+
+### Full time series
+
+no priors, no Blim
+
+```{r}
+SRmods <- c("bevholt", "ricker", "segreg3")
+
+# "segreg3" not used by srrTMB
+SRmodsAdj <- replace(SRmods, SRmods == "segreg3", "segreg") 
+
+SR <- as.FLSR(stock)
+Bemp <- ssb(SR)[,rec(SR)>median(rec(SR))] |> c() |> sort() |> head(3) |> mean()
+
+SRs <- as.FLSRs(stock, model = SRmodsAdj)
+SRs <- srrTMB(SRs, spr0 = mean(spr0y(stock)))#, Blim = Bemp)
+
+p <- plotsrs(SRs)
+
+fname <- "report/figs/srrTMB_fits_full.png"
+png(fname, width = 6, height = 4.5, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+But, strong trend in residuals...
+
+segreg
+
+```{r}
+p <- plot(SRs[[3]])
+
+fname <- "report/figs/segreg_diag_full.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+bevholt
+
+```{r}
+p <- plot(SRs[[1]])
+
+fname <- "report/figs/bevholt_diag_full.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+### Truncation to recent period
+
+Similar to recent benchmark - truncation to 20 years, use of Bemp
+
+
+```{r}
+recrLag <- RANGE["min"]
+stkSRyrs <- stock[,ac(srr_years)]
+
+SRs <- as.FLSRs(stkSRyrs, model = SRmodsAdj)
+SRs <- suppressWarnings(srrTMB(SRs, spr0 = mean(spr0y(stkSRyrs)), Blim = Bemp))
+
+
+p <- plotsrs(SRs)
+
+fname <- "report/figs/srrTMB_fits_trunc.png"
+png(fname, width = 6, height = 4.5, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+
+Priors on steepness (using FishLife) help for bevholt an ricker
+
+```{r}
+SRs <- suppressWarnings(srrTMB(SRs, spr0 = mean(spr0y(stkSRyrs)), Blim = Bemp, s = 0.75, s.logitsd = 0.4))
+
+p <- plotsrs(SRs)
+
+fname <- "report/figs/srrTMB_fits_trunc_h-prior.png"
+png(fname, width = 6, height = 4.5, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+But trend in residuals remains
+
+segreg
+
+```{r}
+p <- plot(SRs[[3]])
+
+fname <- "report/figs/segreg_diag_trunc_h-prior.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+Bevholt:
+
+```{r}
+p <- plot(SRs[[1]])
+
+fname <- "report/figs/bevholt_diag_trunc_h-prior.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+```
+
+### Simulating lower-productivity 
+
+
+```{r}
+rec_lag <- c(range(stock)["min"])
+tmp <- SRs[[3]]
+df <- tibble(as.data.frame(tmp))
+df <- df |> select(slot, year, data)
+df <- df |> mutate(yearRec = ifelse(slot == "ssb", year+rec_lag, year))
+df <- df |> select(slot, yearRec, data)
+
+df <- df |> pivot_wider(names_from = slot, values_from = data)
+fit <- loess(residuals ~ yearRec, data = df, span = 3)
+
+df <- df |> mutate(resid_fit = predict(fit), resid_fit_diff = resid_fit - residuals)
+
+residFitSum <- df |> summarise(
+  meanResid_last10 = mean(tail(resid_fit, 10)), 
+  meanResid_last5 = mean(tail(resid_fit, 5)), 
+  cvResid_orig = sd(residuals), 
+  cvResid_minus_trend = sd(resid_fit))
+
+# simulate predictions
+ps <- c(SRs[[3]]@params)
+pred <- tibble(ssb = seq(1, c(max(ssb(stock))), len = 100))
+
+pred20 <- pred |> mutate(
+  scen = "20_year",
+  rec = ifelse(ssb <= ps[2],  ps[1] * ssb,  ps[1] *  ps[2]),
+  q50 = exp(log(rec) + 0),
+  q025 = exp(log(q50) + qnorm(p = 0.025, mean = 0, sd = residFitSum$cvResid_orig)),
+  q975 = exp(log(q50) + qnorm(p = 0.975, mean = 0, sd = residFitSum$cvResid_orig)))
+
+pred10 <- pred |> mutate(
+  scen = "10_year",
+  rec = ifelse(ssb <= ps[2],  ps[1] * ssb,  ps[1] *  ps[2]),
+  q50 = exp(log(rec) + residFitSum$meanResid_last10),
+  q025 = exp(log(q50) + qnorm(p = 0.025, mean = 0, sd = residFitSum$cvResid_minus_trend)),
+  q975 = exp(log(q50) + qnorm(p = 0.975, mean = 0, sd = residFitSum$cvResid_minus_trend)))
+
+pred5 <- pred |> mutate(
+  scen = "5_year",
+  rec = ifelse(ssb <= ps[2],  ps[1] * ssb,  ps[1] *  ps[2]),
+  q50 = exp(log(rec) + residFitSum$meanResid_last5),
+  q025 = exp(log(q50) + qnorm(p = 0.025, mean = 0, sd = residFitSum$cvResid_minus_trend)),
+  q975 = exp(log(q50) + qnorm(p = 0.975, mean = 0, sd = residFitSum$cvResid_minus_trend)))
+
+pred <- rbind(pred20, pred10, pred5)
+pred <- pred |> mutate(group = factor(scen, levels = c("20_year", "10_year", "5_year")))
+
+
+cvLab <- paste(colnames(residFitSum)[3:4], sprintf("%.3f", c(residFitSum[3:4])), sep = " = ", collapse = "\n")
+offsetLab <- paste(colnames(residFitSum)[1:2], sprintf("%.3f", c(residFitSum[1:2])), sep = " = ", collapse = "\n")
+
+df <- df |> mutate(group = factor(ifelse(seq_len(nrow(df)) <= 10, "20_year", ifelse(seq_len(nrow(df)) <= 15, "10_year", "5_year")), 
+  levels = c("20_year", "10_year", "5_year")))
+
+p1 <- ggplot(df) + aes(x = yearRec, y = residuals, colour = group) + 
+  geom_smooth(formula = y ~ x, method = 'loess', span = 3, mapping = aes(group = 1), color = 1) +
+  geom_hline(yintercept = 0, lty = 2) +
+  geom_point() + 
+  annotate("text", x = Inf, y = Inf, label = cvLab, hjust = 1.1, vjust = 1.1, size = 3) +
+  annotate("text", x = -Inf, y = -Inf, label = offsetLab, hjust = -0.1, vjust = -1, size = 3) +
+  labs(x = "Cohort (rec. year)", y = "Residuals") +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw()
+
+
+p2 <- ggplot(pred) + aes(x = ssb, y = q50, ymin = q025, ymax = q975, group = group, color = group, fill = group) + 
+  geom_ribbon(alpha = 0.15, lty = 0) + 
+  geom_line() + 
+  geom_point(data = df, mapping = aes(x = ssb, y = rec, color = group), inherit.aes = F) + 
+  labs(x = "SSB [t]", y = "Recruitment ['000]") +
+  scale_color_brewer(palette = "Set1") +
+  scale_fill_brewer(palette = "Set1") +
+  theme_bw()
+
+p <- (p1 / p2) + plot_layout(guides = "collect")
+
+fname <- "report/figs/low_prod_segreg.png"
+png(fname, width = 6, height = 6, units = "in", res = 400)
+print(p)
+tmp <- dev.off()
+
+tmp <- readPNG(fname)
+knitr::include_graphics(fname, dpi = floor(dim(tmp)[2]/6))
+
+```
+
+
+# Reference points
+
+
+
+
+```{r}
+load("model/newBRPs.Rdata")
+load("model/eqsimBRPs.Rdata")
+
+newBRPs$model <- "mse"
+newBRPs$srr_fit <- "FLSRTMB"
+newBRPs$resamp_meth <- "redraw"
+newBRPs$lag = TRUE
+newBRPs$run = ny
+newBRPs$eval = ey
+
+eqsimBRPs$model <- "Eqsim"
+eqsimBRPs$srr_fit <- "Eqsim"
+eqsimBRPs$resamp_meth <- "bootstrap"
+eqsimBRPs$lag = FALSE
+eqsimBRPs$run = 200
+eqsimBRPs$eval = 50
+
+df <- rbind(newBRPs, eqsimBRPs)
+df <- tibble(df)
+df <- df |> select(-c(Flim, Fmgt))
+df <- df |> pivot_longer(cols = -c(model, srr_fit, resamp_meth, lag, run, eval), names_to = "refpt")
+df <- df |> mutate(id = paste(model, srr_fit, resamp_meth, lag, sep = "_"))
+# df
+
+dfF <- df |> filter(refpt %in% c("Fpa", "FmsyL", "Fmsy", "FmsyH")) |> 
+  select(model, srr_fit, resamp_meth, lag, run, eval, refpt, value) |> 
+  mutate(value = sprintf("%.3f", value)) |> 
+  pivot_wider(names_from = refpt, values_from = value)
+# dfF
+
+dfB <- df |> filter(refpt %in% c("Blim", "Bpa", "Btrigger", "Bmsy", "B0")) |> 
+  select(model, srr_fit, resamp_meth, lag, run, eval, refpt, value) |> 
+  mutate(value = sprintf("%.f", value)) |> 
+  pivot_wider(names_from = refpt, values_from = value)
+# dfB
+
+
+kable(dfF)
+
+kable(dfB)
+
+```
+
+
+
