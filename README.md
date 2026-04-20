@@ -25,17 +25,15 @@ Four main scripts are used: data.R, model.R, output.R, and report.R. In most cas
       - Fscan with assessment error, and without harvest control rule (HCR) to determine MSY reference points (Fmsy, FmsyUpper, FmsyLower, Bmsy, etc.)
       - Single projection without assessment error, without HCR, and at Ftarget equal to Fmsy, to determine Fmsy Btrigger
       - Fscan with assessment error, and with HCR to determine precautionary reference point, Fpa.
+  - **model_06_run_eqsim.R** - Runs reference point estimation with Eqsim.
 - **output.R**
   - **output_01_refpts_summary.R** - Produces summary figures of Fscans: 1. landings & SSB, 2. risk probability.
-- **report.R** - To generate final report with Rmarkdown (TO COME). 
+- **report.R** - To generate final report with Rmarkdown.
+  - **report_01_srr_prod.Rmd** - generates other figures and tables.
 
 
 
 ## To do:
-
-Further documentation:
-
- - Move setting of recruitment resampling in STF to **model_01_settings.R** from **model_05_run_mse.R** (`recyrs = 10`) 
  - Switch from `parallel::parLapply` to `mse::mps` to run Fscan?
  
 ## Other relevant information
